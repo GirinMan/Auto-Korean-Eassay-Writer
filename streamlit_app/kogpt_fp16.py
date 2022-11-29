@@ -34,7 +34,7 @@ def load_gpt():
     return model, tokenizer
 
 
-def generate_sentences(model, tokenizer, text, length):
+def generate_sentences(model, tokenizer, text, length, num_output):
     tokenized_text = tokenizer(text, return_tensors='pt').to('cuda')
     generated_ids = model.generate(
         tokenized_text.input_ids,
@@ -43,7 +43,7 @@ def generate_sentences(model, tokenizer, text, length):
         top_k=10, # 확률 순위 밖인 토큰은 샘플링에서 제외
         top_p=0.6, # 누적 확률 이내의 후보집합에서만 생성
         no_repeat_ngram_size = 4,
-        num_return_sequences = 5 # 한 번에 출력할 다음 문장 선택지의 개수
+        num_return_sequences = num_output # 한 번에 출력할 다음 문장 선택지의 개수
     ).detach().to('cpu')
     
     generated_texts = [tokenizer.decode(id, skip_special_tokens=True) for id in generated_ids]
@@ -59,47 +59,29 @@ def main():
         #### Description
         - 한국어로 학습된 GPT-3 모델을 이용하여 입력된 문장에 이어지는 다음 문장들을 자동으로 생성해주어 좋은 품질의 소감문이나 보고서 등을 빠르게 작성할 수 있습니다.
         - 기존 텍스트를 입력한 뒤 다음 문장 생성 버튼을 누르면 자연스럽게 이어지는 문장 몇 개를 생성해 줍니다.
-        - 생성된 문장을 기존 텍스트에 이어 붙이고 수정한 뒤 문장 생성하는 것을 반복하여 짧은 시간에 사람이 작성한 것 같은 많은 양의 텍스트를 생성할 수 있습니다.
-        - 사랑의실천 과제, 봉사활동 소감문 등 글의 퀄리티는 크게 중요하지 않지만 
+        - 생성된 문장을 기존 텍스트에 이어 붙이고 적당히 수정한 뒤 다음 문장을 생성하는 것을 반복하여 짧은 시간에 사람이 작성한 것 같은 많은 양의 텍스트를 생성할 수 있습니다.
+        - 사랑의실천 과제, 봉사활동 소감문 등 글의 퀄리티는 크게 중요하지 않지만 채워야 하는 분량이 많은 경우에 유용합니다.
         - 모델 서빙 및 현재 보여지는 웹 페이지는 Streamlit을 활용하여 구현되었습니다.
         - Reference: KoGPT: KakaoBrain Korean(hangul) Generative Pre-trained Transformer (https://github.com/kakaobrain/kogpt)
         """)
 
     model, tokenizer = load_gpt()
 
-    message = st.text_area("텍스트 입력", "여기에 입력")
+    input_txt = st.text_area("텍스트 입력", "여기에 입력")
+
+    new_sentence_length = 64
+    num_output = 5
 
     if st.button("다음 문장 생성"):
 
-        st.subheader("번역 결과")
+        st.subheader("문장 생성 결과")
 
-        init = -1
-        target = 1
-        
-        for i in range(len(options)):
-            if input_options == options[i]:
-                init = i
-            if output_options == options[i]:
-                target = i
-        
-        if init == -1:
-            init = classification(class_model, class_tokenizer, message)
-            st.success("입력 텍스트 자동 분류: " + options[init])
+        with st.spinner("Generating next sentences..."):
+            new_sentences = generate_sentences(model, tokenizer, input_txt, new_sentence_length, num_output)
+            new_sentences = [sent.split(input_txt)[-1].replace('\n', ' ') for sent in new_sentences]
 
-        same = False
-        if init == target:
-            same = True
-        elif init == 0 and target == 1:
-            selected = trans_models[0]
-        elif init == 1 and target == 0:
-            selected = trans_models[1]
-        
-        if same:
-            translation_result = message
-        else:
-            translation_result = translation(selected[0], selected[1], message)
-                     
-        st.text_area("", translation_result, label_visibility="collapsed")
+        for sent in new_sentences:
+            st.text_area("", sent, label_visibility="collapsed")
 
 if __name__ == '__main__':
 	main()
