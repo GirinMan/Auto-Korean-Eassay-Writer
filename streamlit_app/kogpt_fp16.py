@@ -14,8 +14,11 @@ import requests
 import torch
 import numpy as np
 import pandas as pd
+import clipboard
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
+
+st.set_page_config(layout="wide")
 
 @st.cache(show_spinner=False, allow_output_mutation=True, suppress_st_warning=True, max_entries=1)
 def load_gpt():
@@ -53,8 +56,8 @@ def main():
     """ NLP Based App with Streamlit """
     
     # Title
-    st.title("Auto Korean Eassay Writer")
-    st.subheader("한국어 기반 자동 작문 프로그램")
+    st.title("Auto Korean Eassay Writer by GirinMan")
+    st.subheader("한국어 기반 자동 작문 프로그램\nhttps://github.com/GirinMan/Auto-Korean-Eassay-Writer")
     st.markdown("""
         #### Description
         - 한국어로 학습된 GPT-3 모델을 이용하여 입력된 문장에 이어지는 다음 문장들을 자동으로 생성해주어 좋은 품질의 소감문이나 보고서 등을 빠르게 작성할 수 있습니다.
@@ -67,21 +70,35 @@ def main():
 
     model, tokenizer = load_gpt()
 
-    input_txt = st.text_area("텍스트 입력", "여기에 입력")
+    input_area = st.empty()
+    input_area.text_area(f"텍스트 입력", "여기에 입력", key='input_txt' ,height=200)
 
     new_sentence_length = 64
     num_output = 5
 
-    if st.button("다음 문장 생성"):
+    col1, col2 = st.columns(2, gap="small", )
+    area = st.container()
 
-        st.subheader("문장 생성 결과")
+    with col1:
+        if st.button("글자 수 세기"):
+            text = st.session_state.input_txt
+            total_count = len(text)
+            char_count = len(text.replace(" ", "").replace("\n", "").replace("\t", ""))
+            area.subheader(f"공백 포함 {total_count}자 / 공백 제외 {char_count}자")
 
-        with st.spinner("Generating next sentences..."):
-            new_sentences = generate_sentences(model, tokenizer, input_txt, new_sentence_length, num_output)
-            new_sentences = [sent.split(input_txt)[-1].replace('\n', ' ') for sent in new_sentences]
+    with col2:
+        if st.button("다음 문장 생성"):
 
-        for sent in new_sentences:
-            st.text_area("", sent, label_visibility="collapsed")
+            area.subheader("문장 생성 결과")
+            input_txt = st.session_state.input_txt
+
+            with area:
+                with st.spinner("Generating next sentences..."):
+                    new_sentences = generate_sentences(model, tokenizer, input_txt, new_sentence_length, num_output)
+                    new_sentences = [sent.split(input_txt)[-1].replace('\n', ' ') for sent in new_sentences]
+
+            for i, sent in enumerate(new_sentences):
+                area.code(sent)
 
 if __name__ == '__main__':
 	main()
